@@ -55,7 +55,7 @@ python -m mini_muse "What did I decide about the chunking strategy?" --docs ./no
 ## Tech Stack
 
 - **Language:** Python 3.11+
-- **Model:** Groq API (Llama 3.3 70B)
+- **Model:** Groq API (gpt-oss-20b)
 - **Retrieval:** FAISS vector index with sentence-transformer embeddings
 - **Persistence:** SQLite for plans, tasks, and audit logs
 - **Isolation:** Docker container with an outbound proxy (Sentinel)

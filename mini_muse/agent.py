@@ -13,7 +13,7 @@ from groq import Groq
 
 from .tools import DISPATCH, TOOL_SCHEMAS
 
-DEFAULT_MODEL = "llama-3.3-70b-versatile"  # a Groq-hosted model that supports tool calling
+DEFAULT_MODEL = "openai/gpt-oss-20b"  # smallest Groq-hosted model that still supports tool calling (lightest on the free TPM cap)
 MAX_TOKENS = 4096
 
 SYSTEM = (
