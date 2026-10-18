@@ -3,7 +3,7 @@
 A personal agent that uses tools, works in the background, answers from your own
 notes, and runs every risky action past a permission layer.
 
-Built with Python, the Anthropic API, FAISS, SQLite, and Docker — from scratch,
+Built with Python, the Groq API, FAISS, SQLite, and Docker — from scratch,
 with no agent framework.
 
 ## Features
@@ -35,7 +35,8 @@ git clone <repo-url>
 cd mini-muse
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-...
+export GROQ_API_KEY=gsk_...
+export TAVILY_API_KEY=tvly-...
 ```
 
 ### 2. Run
@@ -54,7 +55,7 @@ python -m mini_muse "What did I decide about the chunking strategy?" --docs ./no
 ## Tech Stack
 
 - **Language:** Python 3.11+
-- **Model:** Anthropic API (Claude)
+- **Model:** Groq API (Llama 3.3 70B)
 - **Retrieval:** FAISS vector index with sentence-transformer embeddings
 - **Persistence:** SQLite for plans, tasks, and audit logs
 - **Isolation:** Docker container with an outbound proxy (Sentinel)

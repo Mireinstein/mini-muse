@@ -1,20 +1,20 @@
-"""The agent loop, driven by the Anthropic SDK's tool runner.
+"""The agent loop, written against Groq's OpenAI-compatible chat API.
 
-`client.beta.messages.tool_runner(...)` is the standard way to run a custom-tool
-agent: you hand it your tools and the first message, and it does the loop for you
-— call the model, if the model asks for a tool it runs the matching function,
-feeds the result back, and calls the model again, repeating until the model
-answers with no tool call. Iterating the runner yields each assistant message as
-it happens, which is where we read usage (for cost) and the tool calls (for
---verbose). `max_iterations` is the step limit.
+This is the standard function-calling loop: send the conversation, if the model
+replies with tool calls run them and append the results, then send again, until
+the model answers with no tool call. We write the loop by hand here (Groq has no
+auto tool-runner), which is the common industry pattern for OpenAI-compatible
+APIs — and it keeps the request → tool → result cycle in plain view.
 """
 
-from anthropic import Anthropic
+import json
 
-from .tools import TOOLS
+from groq import Groq
 
-DEFAULT_MODEL = "claude-sonnet-5"
-MAX_TOKENS = 16000
+from .tools import DISPATCH, TOOL_SCHEMAS
+
+DEFAULT_MODEL = "llama-3.3-70b-versatile"  # a Groq-hosted model that supports tool calling
+MAX_TOKENS = 4096
 
 SYSTEM = (
     "You are Mini Muse, a tool-using assistant. Break a task into steps and use "
@@ -22,66 +22,105 @@ SYSTEM = (
     "state it directly."
 )
 
-# claude-sonnet-5 list price, dollars per million tokens. (Intro pricing through
-# 2026-08-31 is $2 / $10 — swap these two if you want the cheaper estimate.)
-PRICE_IN_PER_M = 3.0
-PRICE_OUT_PER_M = 15.0
 
+class UsageTracker:
+    """Running total of tokens across the whole run.
 
-class CostTracker:
-    """Running total of tokens and estimated dollar cost across the whole run."""
+    Groq's free tier costs nothing, so there's no dollar figure to show — but
+    token counts still matter (the free tier is rate-limited by tokens/minute),
+    and tracking them is the Stage 1 'cost tracking' skill we'll build on later.
+    """
 
     def __init__(self):
-        self.input_tokens = 0
-        self.output_tokens = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
 
     def add(self, usage):
-        self.input_tokens += usage.input_tokens
-        self.output_tokens += usage.output_tokens
+        if usage is None:
+            return
+        self.prompt_tokens += usage.prompt_tokens
+        self.completion_tokens += usage.completion_tokens
 
     def summary(self) -> str:
-        cost = (
-            self.input_tokens / 1_000_000 * PRICE_IN_PER_M
-            + self.output_tokens / 1_000_000 * PRICE_OUT_PER_M
-        )
         return (
-            f"tokens: {self.input_tokens} in / {self.output_tokens} out  "
-            f"estimated cost: ${cost:.4f}"
+            f"tokens: {self.prompt_tokens} in / {self.completion_tokens} out  "
+            f"(Groq free tier, $0.00)"
         )
+
+
+def run_tool(name: str, raw_arguments: str) -> str:
+    """Run one tool call. Always returns a string — errors come back as text.
+
+    The model sends arguments as a JSON string, so we parse it first. A bad JSON
+    blob, an unknown tool, or wrong arguments all return an error string the model
+    can read and retry, instead of crashing the run.
+    """
+    try:
+        args = json.loads(raw_arguments or "{}")
+    except json.JSONDecodeError:
+        return f"Error: arguments for {name} were not valid JSON."
+
+    func = DISPATCH.get(name)
+    if func is None:
+        return f"Error: unknown tool {name!r}."
+
+    try:
+        return func(**args)
+    except TypeError as e:  # wrong or missing arguments for the function
+        return f"Error: bad arguments for {name}: {e}"
 
 
 def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbose: bool = False) -> None:
     """Drive the loop for a single task and print the final answer."""
-    client = Anthropic()
-    cost = CostTracker()
+    client = Groq()
+    usage = UsageTracker()
+    messages = [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": task},
+    ]
 
-    runner = client.beta.messages.tool_runner(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        system=SYSTEM,
-        tools=TOOLS,
-        messages=[{"role": "user", "content": task}],
-        max_iterations=max_steps,
-    )
+    for _ in range(max_steps):
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            messages=messages,
+            tools=TOOL_SCHEMAS,
+            tool_choice="auto",  # let the model decide whether to call a tool
+        )
+        usage.add(response.usage)
+        message = response.choices[0].message
 
-    # Each iteration is one assistant message. The runner runs any tools it asked
-    # for before the next iteration, so by looping we also watch the tool calls go by.
-    final = None
-    for message in runner:
-        cost.add(message.usage)
-        final = message
-        if verbose:
-            for block in message.content:
-                if block.type == "tool_use":
-                    print(f"[tool] {block.name}({block.input})")
+        # No tool calls means the model is done — print its answer and stop.
+        if not message.tool_calls:
+            print(message.content)
+            break
 
-    # The last message is the model's final turn. If it still wanted a tool, the
-    # runner stopped because it hit the step limit rather than because we finished.
-    if final is not None:
-        if final.stop_reason == "tool_use":
-            print(f"[stopped: reached the {max_steps}-step limit without finishing]")
-        for block in final.content:
-            if block.type == "text":
-                print(block.text)
+        # Keep the assistant turn (with its tool_calls) in history, then answer
+        # each tool call with a "tool" message carrying the result.
+        messages.append({
+            "role": "assistant",
+            "content": message.content or "",
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in message.tool_calls
+            ],
+        })
+        for tc in message.tool_calls:
+            if verbose:
+                print(f"[tool] {tc.function.name}({tc.function.arguments})")
+            result = run_tool(tc.function.name, tc.function.arguments)
+            if verbose:
+                print(f"[result] {result[:300]}")
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result,
+            })
+    else:
+        print(f"[stopped: reached the {max_steps}-step limit without finishing]")
 
-    print("\n" + cost.summary())
+    print("\n" + usage.summary())
