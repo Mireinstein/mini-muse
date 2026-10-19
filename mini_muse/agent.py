@@ -8,6 +8,7 @@ APIs — and it keeps the request → tool → result cycle in plain view.
 """
 
 import json
+from dataclasses import dataclass, field
 
 from groq import Groq
 
@@ -49,6 +50,14 @@ class UsageTracker:
         )
 
 
+@dataclass
+class AgentResult:
+    """What one agent run produced — the answer plus a trace for evaluation."""
+    answer: str
+    usage: UsageTracker
+    tools: list[str] = field(default_factory=list)  # names of tools called, in order
+
+
 def run_tool(name: str, raw_arguments: str) -> str:
     """Run one tool call. Always returns a string — errors come back as text.
 
@@ -71,14 +80,15 @@ def run_tool(name: str, raw_arguments: str) -> str:
         return f"Error: bad arguments for {name}: {e}"
 
 
-def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbose: bool = False) -> tuple[str, UsageTracker]:
-    """Drive the loop for a single task. Returns (final answer, usage).
+def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbose: bool = False) -> AgentResult:
+    """Drive the loop for a single task. Returns the answer, usage, and tool trace.
 
-    It returns the answer rather than printing, so the worker can capture each
-    step's result; the CLI prints what it gets back.
+    It returns rather than printing, so the worker and the evaluator can capture
+    each run's result; the CLI prints what it gets back.
     """
     client = Groq()
     usage = UsageTracker()
+    tools_used: list[str] = []
     messages = [
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": task},
@@ -97,7 +107,7 @@ def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbos
 
         # No tool calls means the model is done — return its answer.
         if not message.tool_calls:
-            return message.content or "", usage
+            return AgentResult(message.content or "", usage, tools_used)
 
         # Keep the assistant turn (with its tool_calls) in history, then answer
         # each tool call with a "tool" message carrying the result.
@@ -114,6 +124,7 @@ def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbos
             ],
         })
         for tc in message.tool_calls:
+            tools_used.append(tc.function.name)
             if verbose:
                 print(f"[tool] {tc.function.name}({tc.function.arguments})")
             result = run_tool(tc.function.name, tc.function.arguments)
@@ -125,4 +136,4 @@ def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbos
                 "content": result,
             })
 
-    return f"[reached the {max_steps}-step limit without finishing]", usage
+    return AgentResult(f"[reached the {max_steps}-step limit without finishing]", usage, tools_used)

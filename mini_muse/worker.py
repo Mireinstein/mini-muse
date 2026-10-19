@@ -30,7 +30,7 @@ def run_plan(plan_id: int, model: str = DEFAULT_MODEL, verbose: bool = False) ->
         print(f"\n== step {step['idx'] + 1}: {step['description']}")
 
         try:
-            answer, _ = run_agent(step["description"], model=model, verbose=verbose)
+            answer = run_agent(step["description"], model=model, verbose=verbose).answer
         except RateLimitError:
             # Free-tier throughput limit — wait and retry the SAME step without
             # spending one of its attempts (it's not the step's fault).

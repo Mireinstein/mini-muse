@@ -5,6 +5,7 @@ Ways to run:
   python -m mini_muse --goal "a goal"     plan the goal, store it, run it
   python -m mini_muse --resume            continue the latest unfinished plan
   python -m mini_muse --ingest            index notes/PDFs in ./docs so the agent can cite them
+  python -m mini_muse --eval              run the evaluation suite and print metrics
 """
 
 import argparse
@@ -27,6 +28,8 @@ def main() -> None:
     parser.add_argument("--goal", help="A goal to plan into steps, store, and run in the background.")
     parser.add_argument("--resume", action="store_true", help="Continue the latest unfinished plan.")
     parser.add_argument("--ingest", nargs="?", const="docs", metavar="FOLDER", help="Index notes/PDFs for the search_docs tool (default folder: ./docs).")
+    parser.add_argument("--eval", action="store_true", help="Run the evaluation suite and print metrics.")
+    parser.add_argument("--limit", type=int, help="With --eval, run only the first N tasks.")
     parser.add_argument("--max-steps", type=int, default=10, help="Max loop iterations per agent task.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Groq model to call.")
     parser.add_argument("--verbose", action="store_true", help="Print each tool call and its result.")
@@ -41,6 +44,11 @@ def main() -> None:
 
     if not os.environ.get("GROQ_API_KEY"):
         sys.exit("GROQ_API_KEY is not set. Add it to your environment or a .env file.")
+
+    if args.eval:
+        from .evaluate import evaluate
+        evaluate(model=args.model, limit=args.limit, verbose=args.verbose)
+        return
 
     if args.resume:
         storage.init_db()
@@ -63,9 +71,9 @@ def main() -> None:
         return
 
     if args.task:
-        answer, usage = run_agent(args.task, model=args.model, max_steps=args.max_steps, verbose=args.verbose)
-        print(answer)
-        print("\n" + usage.summary())
+        result = run_agent(args.task, model=args.model, max_steps=args.max_steps, verbose=args.verbose)
+        print(result.answer)
+        print("\n" + result.usage.summary())
         return
 
     parser.error("give a task, --goal, or --resume")

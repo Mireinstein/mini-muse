@@ -4,3 +4,4 @@ python-dotenv
 chromadb
 sentence-transformers
 pypdf
+mlflow
