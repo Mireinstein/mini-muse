@@ -14,9 +14,9 @@ import os
 import subprocess
 import sys
 
-# run_python kills any snippet that runs longer than this (seconds). Stage 1 has
-# no real sandbox — that's Stage 4 (Docker). This is just a plain subprocess, so
-# the timeout is the only guard against a runaway script.
+# run_python kills any snippet that runs longer than this (seconds). There's no
+# sandbox yet — this is a plain subprocess, so the timeout is the only guard
+# against a runaway script.
 PYTHON_TIMEOUT = 15
 
 # read_file refuses anything larger than this so a huge file can't blow up the

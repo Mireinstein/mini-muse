@@ -28,7 +28,7 @@ class UsageTracker:
 
     Groq's free tier costs nothing, so there's no dollar figure to show — but
     token counts still matter (the free tier is rate-limited by tokens/minute),
-    and tracking them is the Stage 1 'cost tracking' skill we'll build on later.
+    and tracking them helps spot a run that's doing far more work than expected.
     """
 
     def __init__(self):
@@ -70,8 +70,12 @@ def run_tool(name: str, raw_arguments: str) -> str:
         return f"Error: bad arguments for {name}: {e}"
 
 
-def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbose: bool = False) -> None:
-    """Drive the loop for a single task and print the final answer."""
+def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbose: bool = False) -> tuple[str, UsageTracker]:
+    """Drive the loop for a single task. Returns (final answer, usage).
+
+    It returns the answer rather than printing, so the worker can capture each
+    step's result; the CLI prints what it gets back.
+    """
     client = Groq()
     usage = UsageTracker()
     messages = [
@@ -90,10 +94,9 @@ def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbos
         usage.add(response.usage)
         message = response.choices[0].message
 
-        # No tool calls means the model is done — print its answer and stop.
+        # No tool calls means the model is done — return its answer.
         if not message.tool_calls:
-            print(message.content)
-            break
+            return message.content or "", usage
 
         # Keep the assistant turn (with its tool_calls) in history, then answer
         # each tool call with a "tool" message carrying the result.
@@ -120,7 +123,5 @@ def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10, verbos
                 "tool_call_id": tc.id,
                 "content": result,
             })
-    else:
-        print(f"[stopped: reached the {max_steps}-step limit without finishing]")
 
-    print("\n" + usage.summary())
+    return f"[reached the {max_steps}-step limit without finishing]", usage

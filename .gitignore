@@ -4,3 +4,4 @@ CLAUDE.md
 .venv/
 __pycache__/
 *.pyc
+mini_muse.db
