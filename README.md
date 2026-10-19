@@ -45,17 +45,19 @@ export TAVILY_API_KEY=tvly-...
 # Answer a multi-step question (search, compute, summarize)
 python -m mini_muse "What's the average of the last three US CPI year-over-year figures?"
 
-# Give it a goal to run in the background
-python -m mini_muse --goal "Draft a weekly summary of my project notes" --background
+# Turn a goal into a stored plan and run it (resume after a stop with --resume)
+python -m mini_muse --goal "Research the three largest cities in Japan and rank them by population"
 
-# Ask a question answered from your own documents, with a citation
-python -m mini_muse "What did I decide about the chunking strategy?" --docs ./notes
+# Answer from your own documents, with a citation
+# (drop .md/.txt/.pdf files in ./docs first)
+python -m mini_muse --ingest
+python -m mini_muse "What did I decide about the chunking strategy?"
 ```
 
 ## Tech Stack
 
 - **Language:** Python 3.11+
 - **Model:** Groq API (gpt-oss-20b)
-- **Retrieval:** FAISS vector index with sentence-transformer embeddings
+- **Retrieval:** Chroma vector store with sentence-transformer embeddings
 - **Persistence:** SQLite for plans, tasks, and audit logs
 - **Isolation:** Docker container with an outbound proxy (Sentinel)

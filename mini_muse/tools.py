@@ -58,6 +58,21 @@ def run_python(code: str) -> str:
     return f"exit code: {proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
 
 
+def search_docs(query: str, k: int = 5) -> str:
+    """Search the user's indexed notes/PDFs and return matching passages with sources."""
+    from .rag import search  # imported lazily so the embedding model only loads when used
+
+    hits = search(query, k)
+    if not hits:
+        return "No indexed documents. Run `python -m mini_muse --ingest <folder>` first."
+
+    blocks = []
+    for h in hits:
+        tag = f"{os.path.basename(h['source'])} #{h['chunk']}"
+        blocks.append(f"[{tag}]\n{h['text']}")
+    return "\n\n".join(blocks)
+
+
 def read_file(path: str) -> str:
     """Read a UTF-8 text file, with clear errors for missing/oversized/binary files."""
     if not os.path.isfile(path):
@@ -110,6 +125,21 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_docs",
+            "description": "Search the user's own indexed notes and PDFs for relevant passages. Use this to answer questions about the user's documents.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "What to look for."},
+                    "k": {"type": "integer", "description": "How many passages to return (default 5)."},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_file",
             "description": "Read a UTF-8 text file from the local filesystem and return its contents.",
             "parameters": {
@@ -127,5 +157,6 @@ TOOL_SCHEMAS = [
 DISPATCH = {
     "web_search": web_search,
     "run_python": run_python,
+    "search_docs": search_docs,
     "read_file": read_file,
 }

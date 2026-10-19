@@ -5,3 +5,6 @@ CLAUDE.md
 __pycache__/
 *.pyc
 mini_muse.db
+chroma_db/
+docs/*
+!docs/README.md

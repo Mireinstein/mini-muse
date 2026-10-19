@@ -1,9 +1,10 @@
 """Command-line entry point.
 
-Three ways to run:
+Ways to run:
   python -m mini_muse "a question"        one-shot: answer now
   python -m mini_muse --goal "a goal"     plan the goal, store it, run it
   python -m mini_muse --resume            continue the latest unfinished plan
+  python -m mini_muse --ingest            index notes/PDFs in ./docs so the agent can cite them
 """
 
 import argparse
@@ -25,10 +26,18 @@ def main() -> None:
     parser.add_argument("task", nargs="?", help="A one-shot question for the agent to answer now.")
     parser.add_argument("--goal", help="A goal to plan into steps, store, and run in the background.")
     parser.add_argument("--resume", action="store_true", help="Continue the latest unfinished plan.")
+    parser.add_argument("--ingest", nargs="?", const="docs", metavar="FOLDER", help="Index notes/PDFs for the search_docs tool (default folder: ./docs).")
     parser.add_argument("--max-steps", type=int, default=10, help="Max loop iterations per agent task.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Groq model to call.")
     parser.add_argument("--verbose", action="store_true", help="Print each tool call and its result.")
     args = parser.parse_args()
+
+    # Ingestion is fully local (no model calls), so it doesn't need a Groq key.
+    if args.ingest:
+        from .rag import ingest
+        count = ingest(args.ingest)
+        print(f"indexed {count} chunks from {args.ingest}")
+        return
 
     if not os.environ.get("GROQ_API_KEY"):
         sys.exit("GROQ_API_KEY is not set. Add it to your environment or a .env file.")
