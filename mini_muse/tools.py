@@ -25,22 +25,15 @@ MAX_FILE_BYTES = 100_000
 
 
 def web_search(query: str, max_results: int = 5) -> str:
-    """Search the web via Tavily and return a compact title/url/snippet list."""
-    api_key = os.environ.get("TAVILY_API_KEY")
-    if not api_key:
-        return "Error: TAVILY_API_KEY is not set, so web search is unavailable."
+    """Search the web. Routed through Sentinel, which holds the real credential."""
+    from . import sentinel
+    return sentinel.web_search(query, max_results)
 
-    from tavily import TavilyClient  # imported here so the key is only needed when searching
 
-    client = TavilyClient(api_key=api_key)
-    results = client.search(query=query, max_results=max_results).get("results", [])
-    if not results:
-        return "No results."
-
-    lines = []
-    for r in results:
-        lines.append(f"- {r.get('title', '(no title)')}\n  {r.get('url', '')}\n  {r.get('content', '')}")
-    return "\n".join(lines)
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email. Routed through Sentinel, which gates this write action."""
+    from . import sentinel
+    return sentinel.send_email(to, subject, body)
 
 
 def run_python(code: str) -> str:
@@ -125,6 +118,22 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "send_email",
+            "description": "Send an email to a recipient. A write action; it is checked by the permission layer before sending.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "to": {"type": "string", "description": "Recipient email address."},
+                    "subject": {"type": "string", "description": "Email subject."},
+                    "body": {"type": "string", "description": "Email body."},
+                },
+                "required": ["to", "subject", "body"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_docs",
             "description": "Search the user's own indexed notes and PDFs for relevant passages. Use this to answer questions about the user's documents.",
             "parameters": {
@@ -157,6 +166,7 @@ TOOL_SCHEMAS = [
 DISPATCH = {
     "web_search": web_search,
     "run_python": run_python,
+    "send_email": send_email,
     "search_docs": search_docs,
     "read_file": read_file,
 }

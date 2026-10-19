@@ -8,3 +8,4 @@ mini_muse.db
 chroma_db/
 docs/*
 !docs/README.md
+sentinel_audit.log
