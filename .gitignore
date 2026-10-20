@@ -12,3 +12,6 @@ sentinel_audit.log
 mlruns/
 eval/.chroma_eval/
 eval/results.json
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

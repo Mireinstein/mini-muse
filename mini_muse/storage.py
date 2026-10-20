@@ -38,6 +38,13 @@ CREATE TABLE IF NOT EXISTS logs (
     content    TEXT,
     created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tasks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    text       TEXT NOT NULL,
+    due        TEXT,                              -- free-form, e.g. "tomorrow 5pm"
+    done       INTEGER NOT NULL DEFAULT 0,        -- 0 = open, 1 = completed
+    created_at REAL NOT NULL
+);
 """
 
 
@@ -119,6 +126,14 @@ def latest_unfinished_plan() -> sqlite3.Row | None:
         ).fetchone()
 
 
+def list_plans(limit: int = 50) -> list[sqlite3.Row]:
+    """Most recent plans first — powers the web jobs panel."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM plans ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+
 def plan_steps(plan_id: int) -> list[sqlite3.Row]:
     with connect() as conn:
         return conn.execute(
@@ -132,3 +147,30 @@ def log(kind: str, content: str = "", plan_id: int | None = None, step_id: int |
             "INSERT INTO logs (plan_id, step_id, kind, content, created_at) VALUES (?, ?, ?, ?, ?)",
             (plan_id, step_id, kind, content, time.time()),
         )
+
+
+# --- tasks / reminders ------------------------------------------------------
+
+def add_task(text: str, due: str | None = None) -> int:
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO tasks (text, due, created_at) VALUES (?, ?, ?)",
+            (text, due, time.time()),
+        )
+        return cur.lastrowid
+
+
+def list_tasks(include_done: bool = False) -> list[sqlite3.Row]:
+    query = "SELECT * FROM tasks"
+    if not include_done:
+        query += " WHERE done=0"
+    query += " ORDER BY id"
+    with connect() as conn:
+        return conn.execute(query).fetchall()
+
+
+def complete_task(task_id: int) -> bool:
+    """Mark a task done; returns False if no such task exists."""
+    with connect() as conn:
+        cur = conn.execute("UPDATE tasks SET done=1 WHERE id=?", (task_id,))
+        return cur.rowcount > 0

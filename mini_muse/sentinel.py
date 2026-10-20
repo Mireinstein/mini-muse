@@ -29,13 +29,36 @@ def _audit(entry: dict) -> None:
         f.write(json.dumps(entry) + "\n")
 
 
-def _approve(description: str) -> bool:
+def _approve_terminal(description: str) -> bool:
     """Ask the human operator at the terminal. The agent can't answer for itself."""
     print(f"\n[SENTINEL] approval required: {description}")
     try:
         return input("[SENTINEL] allow this action? [y/N] ").strip().lower() == "y"
     except EOFError:
         return False  # no interactive operator present -> deny by default
+
+
+# How Sentinel asks a human to approve a write. The CLI uses the terminal prompt;
+# the web server swaps in a browser-driven approver via set_approver(). Either
+# way the agent itself never gets to answer — only a human does.
+_approver = _approve_terminal
+
+
+def set_approver(fn) -> None:
+    """Replace the approval mechanism (e.g. the web server's approve/deny prompt)."""
+    global _approver
+    _approver = fn
+
+
+def reset_approver() -> None:
+    """Restore the default terminal approver."""
+    global _approver
+    _approver = _approve_terminal
+
+
+def _approve(description: str) -> bool:
+    """Route an approval request to whatever approver is currently installed."""
+    return _approver(description)
 
 
 def web_search(query: str, max_results: int = 5) -> str:

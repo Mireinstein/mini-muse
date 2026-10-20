@@ -6,6 +6,7 @@ Ways to run:
   python -m mini_muse --resume            continue the latest unfinished plan
   python -m mini_muse --ingest            index notes/PDFs in ./docs so the agent can cite them
   python -m mini_muse --eval              run the evaluation suite and print metrics
+  python -m mini_muse --serve             start the web app (chat UI + background jobs)
 """
 
 import argparse
@@ -29,6 +30,8 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true", help="Continue the latest unfinished plan.")
     parser.add_argument("--ingest", nargs="?", const="docs", metavar="FOLDER", help="Index notes/PDFs for the search_docs tool (default folder: ./docs).")
     parser.add_argument("--eval", action="store_true", help="Run the evaluation suite and print metrics.")
+    parser.add_argument("--serve", action="store_true", help="Start the web app (chat UI + background jobs).")
+    parser.add_argument("--port", type=int, default=8000, help="Port for --serve (default 8000).")
     parser.add_argument("--limit", type=int, help="With --eval, run only the first N tasks.")
     parser.add_argument("--max-steps", type=int, default=10, help="Max loop iterations per agent task.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Groq model to call.")
@@ -48,6 +51,13 @@ def main() -> None:
     if args.eval:
         from .evaluate import evaluate
         evaluate(model=args.model, limit=args.limit, verbose=args.verbose)
+        return
+
+    if args.serve:
+        import uvicorn
+        from .web.server import app
+        print(f"Mini Muse web app on http://127.0.0.1:{args.port}")
+        uvicorn.run(app, host="127.0.0.1", port=args.port)
         return
 
     if args.resume:

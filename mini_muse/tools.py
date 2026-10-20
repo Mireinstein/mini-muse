@@ -66,6 +66,36 @@ def search_docs(query: str, k: int = 5) -> str:
     return "\n\n".join(blocks)
 
 
+def add_task(text: str, due: str = "") -> str:
+    """Save a to-do / reminder for the user. A local write — nothing leaves the machine."""
+    from . import storage
+    storage.init_db()  # make sure the tasks table exists on a fresh run
+    task_id = storage.add_task(text, due or None)
+    when = f" (due {due})" if due else ""
+    return f"Saved task #{task_id}: {text}{when}"
+
+
+def list_tasks() -> str:
+    """List the user's open to-dos / reminders."""
+    from . import storage
+    storage.init_db()
+    tasks = storage.list_tasks()
+    if not tasks:
+        return "No open tasks."
+    return "\n".join(
+        f"#{t['id']}: {t['text']}" + (f" (due {t['due']})" if t["due"] else "")
+        for t in tasks
+    )
+
+
+def complete_task(id: int) -> str:
+    """Mark one of the user's tasks done by its id."""
+    from . import storage
+    storage.init_db()
+    ok = storage.complete_task(id)
+    return f"Completed task #{id}." if ok else f"Error: no task #{id}."
+
+
 def read_file(path: str) -> str:
     """Read a UTF-8 text file, with clear errors for missing/oversized/binary files."""
     if not os.path.isfile(path):
@@ -160,6 +190,43 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_task",
+            "description": "Save a to-do or reminder for the user. Use this when the user asks to be reminded of or to remember something.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "What to remember/do."},
+                    "due": {"type": "string", "description": "Optional when it's due, free-form e.g. 'tomorrow 5pm'."},
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_tasks",
+            "description": "List the user's open to-dos / reminders.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "complete_task",
+            "description": "Mark one of the user's saved tasks as done, by its id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer", "description": "The task id to complete."},
+                },
+                "required": ["id"],
+            },
+        },
+    },
 ]
 
 # name -> function. The agent calls DISPATCH[name](**args).
@@ -169,4 +236,7 @@ DISPATCH = {
     "send_email": send_email,
     "search_docs": search_docs,
     "read_file": read_file,
+    "add_task": add_task,
+    "list_tasks": list_tasks,
+    "complete_task": complete_task,
 }
