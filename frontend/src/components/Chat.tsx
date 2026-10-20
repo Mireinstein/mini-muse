@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { chatStream, postApprove } from "../api";
+import { chatStream, getHistory, postApprove } from "../api";
 import type { Approval, ChatEvent, ChatMessage } from "../types";
 import Message from "./Message";
 import ApprovalPrompt from "./ApprovalPrompt";
+
+// Keep the same conversation id across reloads so persisted history comes back.
+function loadConversationId(): string {
+  try {
+    const saved = localStorage.getItem("mini-muse-conversation");
+    if (saved) return saved;
+    const id = crypto.randomUUID();
+    localStorage.setItem("mini-muse-conversation", id);
+    return id;
+  } catch {
+    return crypto.randomUUID(); // private mode / blocked storage: in-memory only
+  }
+}
 
 // Apply one streamed event to the in-flight assistant message (always the last).
 function applyEvent(messages: ChatMessage[], ev: ChatEvent): ChatMessage[] {
@@ -43,8 +56,17 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
-  const conversationId = useRef(crypto.randomUUID());
+  const conversationId = useRef(loadConversationId());
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // On first load, restore any persisted messages for this conversation.
+  useEffect(() => {
+    getHistory(conversationId.current)
+      .then((msgs) =>
+        setMessages(msgs.map((m) => ({ role: m.role, content: m.content, tools: [] }))),
+      )
+      .catch(() => {}); // no history yet / offline: start empty
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

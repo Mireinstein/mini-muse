@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     done       INTEGER NOT NULL DEFAULT 0,        -- 0 = open, 1 = completed
     created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    role            TEXT NOT NULL,                -- user | assistant
+    content         TEXT NOT NULL,
+    created_at      REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id);
 """
 
 
@@ -174,3 +182,31 @@ def complete_task(task_id: int) -> bool:
     with connect() as conn:
         cur = conn.execute("UPDATE tasks SET done=1 WHERE id=?", (task_id,))
         return cur.rowcount > 0
+
+
+# --- conversation history ---------------------------------------------------
+
+def add_message(conversation_id: str, role: str, content: str) -> None:
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)",
+            (conversation_id, role, content, time.time()),
+        )
+
+
+def get_messages(conversation_id: str) -> list[sqlite3.Row]:
+    """Every message in one conversation, oldest first — restores a chat on reload."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY id",
+            (conversation_id,),
+        ).fetchall()
+
+
+def list_conversations() -> list[sqlite3.Row]:
+    """One row per conversation: its id, message count, and last-activity time."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT conversation_id, COUNT(*) AS messages, MAX(created_at) AS last_at "
+            "FROM messages GROUP BY conversation_id ORDER BY last_at DESC"
+        ).fetchall()

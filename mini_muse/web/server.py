@@ -29,9 +29,6 @@ load_dotenv()  # pick up GROQ_API_KEY / TAVILY_API_KEY from a local .env
 
 app = FastAPI(title="Mini Muse")
 
-# Per-conversation message history, in memory (persisting it is a later refinement).
-_conversations: dict[str, list[dict]] = {}
-
 # Sentinel marking the end of a chat's event stream.
 _STREAM_DONE = object()
 
@@ -49,7 +46,8 @@ async def chat(request: Request):
     user_message = body["message"]
     model = body.get("model", DEFAULT_MODEL)
 
-    history = _conversations.setdefault(conversation_id, [])
+    storage.init_db()
+    history = [{"role": m["role"], "content": m["content"]} for m in storage.get_messages(conversation_id)]
     messages = [{"role": "system", "content": SYSTEM}, *history, {"role": "user", "content": user_message}]
 
     events: queue.Queue = queue.Queue()
@@ -67,9 +65,9 @@ async def chat(request: Request):
             events.put({"type": "error", "message": str(exc)})
         finally:
             sentinel.reset_approver()
-            history.append({"role": "user", "content": user_message})
+            storage.add_message(conversation_id, "user", user_message)
             if answer:
-                history.append({"role": "assistant", "content": answer})
+                storage.add_message(conversation_id, "assistant", answer)
             events.put(_STREAM_DONE)
 
     threading.Thread(target=run, daemon=True).start()
@@ -124,6 +122,20 @@ async def plan_detail(plan_id: int):
     if plan is None:
         return JSONResponse({"error": "not found"}, status_code=404)
     return JSONResponse({"plan": dict(plan), "steps": [dict(s) for s in storage.plan_steps(plan_id)]})
+
+
+@app.get("/api/conversations")
+async def conversations():
+    """Every conversation with its message count — newest activity first."""
+    storage.init_db()
+    return JSONResponse({"conversations": [dict(c) for c in storage.list_conversations()]})
+
+
+@app.get("/api/conversations/{conversation_id}")
+async def conversation_history(conversation_id: str):
+    """The stored messages for one conversation, so a page reload restores the chat."""
+    storage.init_db()
+    return JSONResponse({"messages": [dict(m) for m in storage.get_messages(conversation_id)]})
 
 
 # Serve the built frontend (after `npm run build`) at a single origin, if present.

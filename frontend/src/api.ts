@@ -32,6 +32,15 @@ export async function* chatStream(
   }
 }
 
+// Load a conversation's stored messages so a page reload restores the chat.
+export async function getHistory(
+  conversationId: string,
+): Promise<{ role: "user" | "assistant"; content: string }[]> {
+  const res = await fetch(`/api/conversations/${conversationId}`);
+  const data = await res.json();
+  return data.messages as { role: "user" | "assistant"; content: string }[];
+}
+
 export async function postApprove(id: number, allow: boolean): Promise<void> {
   await fetch("/api/approve", {
     method: "POST",
