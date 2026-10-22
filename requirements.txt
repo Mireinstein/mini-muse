@@ -1,9 +1,7 @@
 groq
-tavily-python
 python-dotenv
 chromadb
 sentence-transformers
 pypdf
-mlflow
 fastapi
 uvicorn[standard]

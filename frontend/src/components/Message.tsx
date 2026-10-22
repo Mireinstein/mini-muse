@@ -1,10 +1,9 @@
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage } from "../types";
-import ToolCall from "./ToolCall";
 import Citations, { extractCitations } from "./Citation";
 
 // One chat bubble. User messages are plain text; assistant messages render
-// Markdown, list the tools they used, and chip any document citations.
+// Markdown and chip any source citations the answer carries.
 export default function Message({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
 
@@ -22,10 +21,7 @@ export default function Message({ message }: { message: ChatMessage }) {
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[85%] space-y-1">
-        {message.tools.map((tool, i) => (
-          <ToolCall key={i} tool={tool} />
-        ))}
+      <div className="max-w-[85%]">
         {message.content && (
           <div className="prose-chat rounded-2xl rounded-bl-sm bg-slate-800 px-4 py-2 text-slate-100">
             <ReactMarkdown>{message.content}</ReactMarkdown>

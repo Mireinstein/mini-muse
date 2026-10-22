@@ -7,7 +7,7 @@ __pycache__/
 mini_muse.db
 chroma_db/
 docs/*
-!docs/README.md
+!docs/about.md
 sentinel_audit.log
 mlruns/
 eval/.chroma_eval/
