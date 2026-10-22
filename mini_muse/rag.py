@@ -31,12 +31,22 @@ def _embedder():
     return _EMBEDDER
 
 
-def _collection():
+def chroma_client():
+    """The shared on-disk Chroma client, so other modules reuse one connection."""
     global _CLIENT
     if _CLIENT is None:
         import chromadb
         _CLIENT = chromadb.PersistentClient(path=CHROMA_DIR)
-    return _CLIENT.get_or_create_collection(COLLECTION)
+    return _CLIENT
+
+
+def embedder():
+    """The shared local embedding model (loaded once, reused everywhere)."""
+    return _embedder()
+
+
+def _collection():
+    return chroma_client().get_or_create_collection(COLLECTION)
 
 
 def _read_doc(path: str) -> str:

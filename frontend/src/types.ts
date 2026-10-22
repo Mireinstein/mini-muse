@@ -44,3 +44,9 @@ export interface Plan {
   status: "running" | "done" | "failed";
   created_at: number;
 }
+
+// One thing the agent remembers about the user (from /api/memories).
+export interface Memory {
+  id: string;
+  text: string;
+}

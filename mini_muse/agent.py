@@ -24,10 +24,22 @@ DEFAULT_MODEL = "openai/gpt-oss-20b"  # smallest Groq-hosted model that still su
 MAX_TOKENS = 4096
 
 SYSTEM = (
-    "You are Mini Muse, a tool-using assistant. Break a task into steps and use "
-    "the tools to search, compute, and read files. When you have the answer, "
-    "state it directly. When you answer from the user's own documents via "
-    "search_docs, cite the source each fact came from in brackets, e.g. [notes.md #3]."
+    "You are Mini Muse, a personal AI agent. You don't just answer questions — you "
+    "carry out tasks using your tools, and you keep track of what matters to the user.\n\n"
+    "Your tools: web_search and fetch_url (find and read web pages), run_python "
+    "(calculate or process data), search_docs (the user's own notes and PDFs), "
+    "read_file and write_file (local files), add_task / list_tasks / complete_task "
+    "(reminders), remember / recall (long-term memory of the user's preferences and "
+    "facts), and send_email (gated by a permission layer).\n\n"
+    "How to work:\n"
+    "- Break a goal into steps and use the tools to actually do it, not just describe it.\n"
+    "- When the user shares a lasting preference or detail about themselves, call "
+    "remember so you can use it in future conversations; recall what you know when relevant.\n"
+    "- When you answer from the user's documents via search_docs, cite the source of "
+    "each fact in brackets, e.g. [notes.md #3].\n"
+    "- Actions that leave the machine (like send_email) pass through a permission layer "
+    "that may ask the user to approve them — that is expected, not an error.\n"
+    "- Be proactive: when you notice a useful next step, offer it briefly."
 )
 
 
@@ -84,7 +96,7 @@ def run_tool(name: str, raw_arguments: str) -> str:
         return f"Error: bad arguments for {name}: {e}"
 
 
-def stream_agent(messages: list[dict], model: str = DEFAULT_MODEL, max_steps: int = 10) -> Iterator[dict]:
+def stream_agent(messages: list[dict], model: str = DEFAULT_MODEL, max_steps: int = 12) -> Iterator[dict]:
     """Drive the loop, yielding one event dict per thing that happens.
 
     `messages` must already include the system prompt and the user turn(s); it is
@@ -166,7 +178,7 @@ def stream_agent(messages: list[dict], model: str = DEFAULT_MODEL, max_steps: in
     yield {"type": "answer", "content": f"[reached the {max_steps}-step limit without finishing]"}
 
 
-def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 10,
+def run_agent(task: str, model: str = DEFAULT_MODEL, max_steps: int = 12,
               verbose: bool = False, history: list[dict] | None = None) -> AgentResult:
     """Drive the loop for a single task. Returns the answer, usage, and tool trace.
 

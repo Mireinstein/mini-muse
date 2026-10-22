@@ -1,4 +1,4 @@
-import type { ChatEvent, Plan, Step } from "./types";
+import type { ChatEvent, Memory, Plan, Step } from "./types";
 
 // Stream the agent's reply to one message. POST can't use EventSource, so we
 // read the response body ourselves and parse the Server-Sent Events frames.
@@ -67,4 +67,20 @@ export async function getPlans(): Promise<Plan[]> {
 export async function getPlan(id: number): Promise<{ plan: Plan; steps: Step[] }> {
   const res = await fetch(`/api/plans/${id}`);
   return res.json();
+}
+
+export async function getMemories(): Promise<Memory[]> {
+  const res = await fetch("/api/memories");
+  const data = await res.json();
+  return (data.memories ?? []) as Memory[];
+}
+
+export async function forgetMemory(id: string): Promise<void> {
+  await fetch(`/api/memories/${id}`, { method: "DELETE" });
+}
+
+export async function getSuggestions(conversationId: string): Promise<string[]> {
+  const res = await fetch(`/api/suggestions?conversation_id=${encodeURIComponent(conversationId)}`);
+  const data = await res.json();
+  return (data.suggestions ?? []) as string[];
 }

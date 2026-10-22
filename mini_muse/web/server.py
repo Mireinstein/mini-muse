@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import sentinel, storage
+from .. import memory, sentinel, storage
 from ..agent import DEFAULT_MODEL, SYSTEM, stream_agent
 from ..planner import make_plan
 from ..worker import run_plan
@@ -48,7 +48,21 @@ async def chat(request: Request):
 
     storage.init_db()
     history = [{"role": m["role"], "content": m["content"]} for m in storage.get_messages(conversation_id)]
-    messages = [{"role": "system", "content": SYSTEM}, *history, {"role": "user", "content": user_message}]
+
+    # Surface what we already know about the user that's relevant to this message,
+    # so the agent uses their preferences without being asked (like Muse's memory).
+    try:
+        recalled = memory.recall(user_message, k=3)
+    except Exception:
+        recalled = []
+    preface = (
+        [{"role": "system", "content": "Relevant things you remember about the user:\n"
+          + "\n".join(f"- {r}" for r in recalled)}]
+        if recalled else []
+    )
+
+    messages = [{"role": "system", "content": SYSTEM}, *preface, *history,
+                {"role": "user", "content": user_message}]
 
     events: queue.Queue = queue.Queue()
 
@@ -136,6 +150,41 @@ async def conversation_history(conversation_id: str):
     """The stored messages for one conversation, so a page reload restores the chat."""
     storage.init_db()
     return JSONResponse({"messages": [dict(m) for m in storage.get_messages(conversation_id)]})
+
+
+@app.get("/api/memories")
+async def memories_list():
+    """Everything the agent remembers about the user — a 'what do you know about me' view."""
+    try:
+        return JSONResponse({"memories": memory.all_memories()})
+    except Exception as exc:
+        return JSONResponse({"memories": [], "error": str(exc)})
+
+
+@app.delete("/api/memories/{mem_id}")
+async def memories_forget(mem_id: str):
+    """Forget one memory by id (the user's 'forget this' control)."""
+    return JSONResponse({"ok": memory.forget(mem_id)})
+
+
+@app.get("/api/suggestions")
+async def suggestions_endpoint(conversation_id: str = "default"):
+    """Proactive next-step suggestions from memory + the recent conversation."""
+    from ..proactive import suggestions as make_suggestions
+
+    storage.init_db()
+    history = [{"role": m["role"], "content": m["content"]} for m in storage.get_messages(conversation_id)]
+    try:
+        if history:
+            mems = memory.recall(" ".join(m["content"] for m in history[-3:]), k=5)
+        else:
+            mems = [m["text"] for m in memory.all_memories()][:5]
+    except Exception:
+        mems = []
+    try:
+        return JSONResponse({"suggestions": make_suggestions(history, mems, model=DEFAULT_MODEL)})
+    except Exception as exc:
+        return JSONResponse({"suggestions": [], "error": str(exc)})
 
 
 # Serve the built frontend (after `npm run build`) at a single origin, if present.

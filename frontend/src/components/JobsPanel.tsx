@@ -67,7 +67,7 @@ export default function JobsPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-slate-800">
+    <div className="flex h-full flex-col">
       <div className="border-b border-slate-800 p-4">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
           Background goals

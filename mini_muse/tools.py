@@ -36,6 +36,75 @@ def send_email(to: str, subject: str, body: str) -> str:
     return sentinel.send_email(to, subject, body)
 
 
+def write_file(path: str, content: str) -> str:
+    """Create or overwrite a local text file. A write action, gated by the permission layer."""
+    from . import sentinel
+    return sentinel.write_file(path, content)
+
+
+def fetch_url(url: str) -> str:
+    """Fetch a web page and return its text. Routed through Sentinel as an outbound read."""
+    from . import sentinel
+    return sentinel.fetch_url(url)
+
+
+def create_calendar_event(title: str, start: str, end: str = "",
+                          description: str = "", location: str = "") -> str:
+    """Create a calendar event as an .ics file the user can import. Gated by the permission layer.
+
+    `start`/`end` look like '2026-10-21 15:00'. If `end` is omitted the event is
+    one hour long.
+    """
+    import datetime
+    import uuid
+    from . import sentinel
+
+    def _fmt(s: str) -> str:
+        return datetime.datetime.fromisoformat(s.strip()).strftime("%Y%m%dT%H%M%S")
+
+    try:
+        dtstart = _fmt(start)
+        if end:
+            dtend = _fmt(end)
+        else:
+            dtend = (datetime.datetime.fromisoformat(start.strip())
+                     + datetime.timedelta(hours=1)).strftime("%Y%m%dT%H%M%S")
+    except ValueError:
+        return "Error: start/end must look like '2026-10-21 15:00'."
+
+    uid = uuid.uuid4().hex
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ics = "\r\n".join([
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Mini Muse//EN",
+        "BEGIN:VEVENT", f"UID:{uid}@mini-muse", f"DTSTAMP:{stamp}",
+        f"DTSTART:{dtstart}", f"DTEND:{dtend}", f"SUMMARY:{title}",
+        f"DESCRIPTION:{description}", f"LOCATION:{location}",
+        "END:VEVENT", "END:VCALENDAR", "",
+    ])
+
+    cal_dir = os.environ.get("MINI_MUSE_CALENDAR_DIR", "calendar_events")
+    os.makedirs(cal_dir, exist_ok=True)
+    slug = "".join(c if c.isalnum() else "-" for c in title.lower()).strip("-")[:40] or "event"
+    path = os.path.join(cal_dir, f"{slug}-{uid[:8]}.ics")
+    return sentinel.write_file(path, ics)
+
+
+def remember(text: str) -> str:
+    """Save a fact to long-term memory. A local write — nothing leaves the machine."""
+    from . import memory
+    memory.remember(text)
+    return f"Got it, I'll remember that: {text}"
+
+
+def recall(query: str, k: int = 5) -> str:
+    """Recall facts relevant to a query from long-term memory."""
+    from . import memory
+    hits = memory.recall(query, k)
+    if not hits:
+        return "I don't have anything relevant in memory."
+    return "\n".join(f"- {h}" for h in hits)
+
+
 def run_python(code: str) -> str:
     """Run a Python snippet in a subprocess and return stdout/stderr/exit code."""
     try:
@@ -164,6 +233,53 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "write_file",
+            "description": "Create or overwrite a local text file. A write action; it is checked by the permission layer before writing.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path of the file to write."},
+                    "content": {"type": "string", "description": "The text to write into the file."},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "fetch_url",
+            "description": "Fetch a web page by URL and return its visible text. Use this to read a specific page (an article, recipe, docs) after finding it, or when the user gives a URL.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The http(s) URL to fetch."},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_calendar_event",
+            "description": "Create a calendar event as an .ics file the user can import into their calendar. A write action, gated by the permission layer.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Event title."},
+                    "start": {"type": "string", "description": "Start time, like '2026-10-21 15:00'."},
+                    "end": {"type": "string", "description": "Optional end time; defaults to one hour after start."},
+                    "description": {"type": "string", "description": "Optional event description."},
+                    "location": {"type": "string", "description": "Optional location."},
+                },
+                "required": ["title", "start"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "search_docs",
             "description": "Search the user's own indexed notes and PDFs for relevant passages. Use this to answer questions about the user's documents.",
             "parameters": {
@@ -227,6 +343,35 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "remember",
+            "description": "Save a fact about the user or their preferences to long-term memory, so you can use it in future conversations. Use this whenever the user shares a lasting preference, detail, or instruction.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "The fact to remember, phrased so it stands on its own."},
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "recall",
+            "description": "Look up facts you've remembered about the user that are relevant to the current request.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "What to look for in memory."},
+                    "k": {"type": "integer", "description": "How many memories to return (default 5)."},
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 # name -> function. The agent calls DISPATCH[name](**args).
@@ -234,9 +379,14 @@ DISPATCH = {
     "web_search": web_search,
     "run_python": run_python,
     "send_email": send_email,
+    "write_file": write_file,
+    "fetch_url": fetch_url,
+    "create_calendar_event": create_calendar_event,
     "search_docs": search_docs,
     "read_file": read_file,
     "add_task": add_task,
     "list_tasks": list_tasks,
     "complete_task": complete_task,
+    "remember": remember,
+    "recall": recall,
 }

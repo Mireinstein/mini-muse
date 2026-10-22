@@ -1,5 +1,6 @@
 import Chat from "./components/Chat";
 import JobsPanel from "./components/JobsPanel";
+import MemoryPanel from "./components/MemoryPanel";
 
 export default function App() {
   return (
@@ -11,9 +12,14 @@ export default function App() {
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[1fr_360px]">
         <Chat />
-        <div className="hidden md:block">
-          <JobsPanel />
-        </div>
+        <aside className="hidden min-h-0 flex-col border-l border-slate-800 md:flex">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <JobsPanel />
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            <MemoryPanel />
+          </div>
+        </aside>
       </div>
     </div>
   );

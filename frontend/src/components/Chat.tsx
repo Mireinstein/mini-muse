@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { chatStream, getHistory, postApprove } from "../api";
+import { chatStream, getHistory, getSuggestions, postApprove } from "../api";
 import type { Approval, ChatEvent, ChatMessage } from "../types";
 import Message from "./Message";
 import ApprovalPrompt from "./ApprovalPrompt";
@@ -56,15 +56,23 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [approval, setApproval] = useState<Approval | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const conversationId = useRef(loadConversationId());
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  function refreshSuggestions() {
+    getSuggestions(conversationId.current)
+      .then(setSuggestions)
+      .catch(() => setSuggestions([]));
+  }
 
   // On first load, restore any persisted messages for this conversation.
   useEffect(() => {
     getHistory(conversationId.current)
-      .then((msgs) =>
-        setMessages(msgs.map((m) => ({ role: m.role, content: m.content, tools: [] }))),
-      )
+      .then((msgs) => {
+        setMessages(msgs.map((m) => ({ role: m.role, content: m.content, tools: [] })));
+        if (msgs.length > 0) refreshSuggestions();
+      })
       .catch(() => {}); // no history yet / offline: start empty
   }, []);
 
@@ -94,6 +102,7 @@ export default function Chat() {
     } finally {
       setBusy(false);
       setApproval(null);
+      refreshSuggestions(); // offer proactive next steps after each turn
     }
   }
 
@@ -120,6 +129,20 @@ export default function Chat() {
       </div>
 
       <div className="border-t border-slate-800 p-3">
+        {!busy && suggestions.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            <span className="self-center text-xs text-slate-500">Suggestions:</span>
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => setInput(s)}
+                className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-sky-500 hover:text-sky-300"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             value={input}
