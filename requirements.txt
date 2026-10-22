@@ -1,7 +1,1 @@
 groq
-python-dotenv
-chromadb
-sentence-transformers
-pypdf
-fastapi
-uvicorn[standard]

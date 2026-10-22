@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { chatStream } from "../api";
-import type { ChatEvent, ChatMessage } from "../types";
+import { ask } from "../api";
+import type { ChatMessage } from "../types";
 import Message from "./Message";
 
 const STARTERS = [
@@ -10,27 +10,6 @@ const STARTERS = [
   "What's he interested in outside work?",
 ];
 
-// Apply one streamed event to the in-flight assistant message (always the last).
-function applyEvent(messages: ChatMessage[], ev: ChatEvent): ChatMessage[] {
-  const copy = messages.slice();
-  const last = { ...copy[copy.length - 1] };
-  switch (ev.type) {
-    case "token":
-      last.content += ev.text;
-      break;
-    case "answer":
-      last.content = ev.content;
-      break;
-    case "error":
-      last.content = (last.content ? last.content + "\n\n" : "") + `⚠️ ${ev.message}`;
-      break;
-    default:
-      return messages; // done: no bubble change
-  }
-  copy[copy.length - 1] = last;
-  return copy;
-}
-
 export default function Chat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -39,25 +18,20 @@ export default function Chat() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, busy]);
 
-  async function ask(text: string) {
+  async function send(text: string) {
     const question = text.trim();
     if (!question || busy) return;
     setInput("");
     const history = messages; // prior completed turns, for follow-up context
-    setMessages((m) => [
-      ...m,
-      { role: "user", content: question },
-      { role: "assistant", content: "" },
-    ]);
+    setMessages((m) => [...m, { role: "user", content: question }]);
     setBusy(true);
     try {
-      for await (const ev of chatStream(question, history)) {
-        setMessages((m) => applyEvent(m, ev));
-      }
+      const answer = await ask(question, history);
+      setMessages((m) => [...m, { role: "assistant", content: answer }]);
     } catch (e) {
-      setMessages((m) => applyEvent(m, { type: "error", message: String(e) }));
+      setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${String(e)}` }]);
     } finally {
       setBusy(false);
     }
@@ -75,7 +49,7 @@ export default function Chat() {
               {STARTERS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => ask(s)}
+                  onClick={() => send(s)}
                   className="rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:border-sky-500 hover:text-sky-300"
                 >
                   {s}
@@ -87,6 +61,7 @@ export default function Chat() {
         {messages.map((m, i) => (
           <Message key={i} message={m} />
         ))}
+        {busy && <div className="pl-1 text-sm text-slate-500">Thinking…</div>}
         <div ref={bottomRef} />
       </div>
 
@@ -95,12 +70,12 @@ export default function Chat() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && ask(input)}
+            onKeyDown={(e) => e.key === "Enter" && send(input)}
             placeholder="Ask about Admire…"
             className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
           />
           <button
-            onClick={() => ask(input)}
+            onClick={() => send(input)}
             disabled={busy}
             className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-500 disabled:opacity-50"
           >
