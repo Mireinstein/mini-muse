@@ -1,15 +1,20 @@
 """Vercel serverless function: answer one question about Admire.
 
-Retrieval-augmented: build_corpus.py chunks Admire's material and stores one
-embedding per chunk in index.json. Here we embed only the incoming question, rank
-the chunks by cosine similarity, and give the model the top few. The index is small
-enough to rank in plain Python, so there is no vector database to host.
+Hybrid retrieval: build_corpus.py stored one embedding per chunk in index.json.
+The question is embedded and ranked against them, ranked again with BM25 keyword
+scoring, and the two rankings are merged with reciprocal rank fusion. The model
+answers from the top chunks.
+
+The index is small enough to rank in plain Python, so there is no vector database
+to host.
 """
 
 import json
 import math
 import os
+import re
 import urllib.request
+from collections import Counter
 from http.server import BaseHTTPRequestHandler
 
 from groq import Groq
@@ -18,10 +23,13 @@ MODEL = "openai/gpt-oss-20b"
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIMS = 768  # must match build_corpus.py, or the vectors aren't comparable
 TOP_K = 8
+RRF_K = 60  # standard reciprocal-rank-fusion constant; damps the weight of the top ranks
 
 with open(os.path.join(os.path.dirname(__file__), "index.json"), encoding="utf-8") as _f:
     INDEX = json.load(_f)
 
+
+# --- Dense retrieval -------------------------------------------------------------
 
 def _embed_query(text: str) -> list[float]:
     body = {
@@ -43,9 +51,59 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)))
 
 
-def retrieve(query: str, k: int = TOP_K) -> list[dict]:
+def _dense_ranking(query: str) -> list[int]:
     q = _embed_query(query)
-    return sorted(INDEX, key=lambda c: _cosine(q, c["embedding"]), reverse=True)[:k]
+    return sorted(range(len(INDEX)), key=lambda i: _cosine(q, INDEX[i]["embedding"]), reverse=True)
+
+
+# --- Keyword retrieval (BM25) ----------------------------------------------------
+
+STOPWORDS = set(
+    "a an and are as at be by did do does for from has have he him his how i in is it "
+    "of on or that the their there this to was what when where which who why with you".split()
+)
+
+
+def _tokens(text: str) -> list[str]:
+    return [t for t in re.findall(r"[a-z0-9+#]+", text.lower()) if t not in STOPWORDS]
+
+
+_DOCS = [Counter(_tokens(f"{c['heading']} {c['text']}")) for c in INDEX]
+_DOC_LEN = [sum(d.values()) for d in _DOCS]
+_AVG_LEN = sum(_DOC_LEN) / len(_DOC_LEN)
+_DF = Counter(term for d in _DOCS for term in d)
+
+
+def _bm25_ranking(query: str, k1: float = 1.5, b: float = 0.75) -> list[int]:
+    n = len(_DOCS)
+    terms = _tokens(query)
+
+    def score(i: int) -> float:
+        total = 0.0
+        for t in terms:
+            tf = _DOCS[i].get(t, 0)
+            if not tf:
+                continue
+            idf = math.log(1 + (n - _DF[t] + 0.5) / (_DF[t] + 0.5))
+            total += idf * tf * (k1 + 1) / (tf + k1 * (1 - b + b * _DOC_LEN[i] / _AVG_LEN))
+        return total
+
+    return sorted(range(n), key=score, reverse=True)
+
+
+def retrieve(query: str, k: int = TOP_K, mode: str = "hybrid") -> list[dict]:
+    """mode is "dense", "bm25", or "hybrid"; the eval compares all three."""
+    if mode == "dense":
+        order = _dense_ranking(query)
+    elif mode == "bm25":
+        order = _bm25_ranking(query)
+    else:
+        fused = Counter()
+        for ranking in (_dense_ranking(query), _bm25_ranking(query)):
+            for rank, i in enumerate(ranking):
+                fused[i] += 1 / (RRF_K + rank + 1)
+        order = [i for i, _ in fused.most_common()]
+    return [INDEX[i] for i in order[:k]]
 
 
 SYSTEM = (

@@ -2,9 +2,11 @@
 
     python eval/run.py                    # all questions
     python eval/run.py --only injection   # one category
+    python eval/run.py --retrieval        # compare dense, BM25 and hybrid retrieval only
 
 Three measurements per question:
-- retrieval: does any of the top-k chunks contain the question's evidence snippet (recall@k)
+- retrieval: do the top-k chunks contain the question's evidence (recall@k). A
+  synthesis question lists one snippet per fact it needs, and counts only if all are found
 - answer: an LLM judge compares the reply with the expected answer
 - booking: did the booking tool fire exactly when it should
 
@@ -13,6 +15,7 @@ to approve phrasing that looks like its own.
 """
 
 import argparse
+import functools
 import json
 import os
 import sys
@@ -93,15 +96,35 @@ def judge(client: Groq, q: dict, reply: str) -> tuple[bool, str]:
     return bool(verdict.get("pass")), verdict.get("reason", "")
 
 
+def retrieval_check(q: dict, k: int, mode: str = "hybrid") -> tuple[bool, int | None]:
+    """(all evidence found in the top k, rank of the first chunk holding any of it)."""
+    snippets = q["evidence"] if isinstance(q["evidence"], list) else [q["evidence"]]
+    chunks = chat.retrieve(chat.search_query(q["question"], q.get("history", [])), k=k, mode=mode)
+    texts = [f"{c['heading']}\n{c['text']}" for c in chunks]
+    found = all(any(s in t for t in texts) for s in snippets)
+    first = next((i + 1 for i, t in enumerate(texts) if any(s in t for s in snippets)), None)
+    return found, first
+
+
+def compare_retrieval(questions: list[dict], k: int) -> None:
+    # Only the query embedding costs an API call, and every mode needs the same ones
+    chat._embed_query = functools.lru_cache(maxsize=None)(chat._embed_query)
+    scored = [q for q in questions if q.get("evidence")]
+    print(f"{len(scored)} questions with evidence\n")
+    print(f"{'mode':<8}{f'recall@{k}':>11}{'recall@3':>10}{'MRR':>7}")
+    for mode in ("dense", "bm25", "hybrid"):
+        at_k = [retrieval_check(q, k, mode) for q in scored]
+        at_3 = [retrieval_check(q, 3, mode)[0] for q in scored]
+        mrr = sum(1 / first for _, first in at_k if first) / len(scored)
+        print(f"{mode:<8}{sum(f for f, _ in at_k) / len(scored):>11.0%}{sum(at_3) / len(scored):>10.0%}{mrr:>7.2f}")
+
+
 def evaluate(q: dict, client: Groq, k: int) -> dict:
     history = q.get("history", [])
     result = {"id": q["id"], "category": q["category"], "question": q["question"]}
 
     if q.get("evidence"):
-        chunks = chat.retrieve(chat.search_query(q["question"], history), k=k)
-        hits = [i for i, c in enumerate(chunks) if q["evidence"] in f"{c['heading']}\n{c['text']}"]
-        result["retrieval_hit"] = bool(hits)
-        result["retrieval_rank"] = hits[0] + 1 if hits else None
+        result["retrieval_hit"], result["retrieval_rank"] = retrieval_check(q, k)
 
     out = with_retry(chat._answer, q["question"], history)
     result["reply"] = out["answer"]
@@ -142,12 +165,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", help="run a single category")
     parser.add_argument("--k", type=int, default=chat.TOP_K)
+    parser.add_argument("--retrieval", action="store_true", help="compare retrieval modes, no model calls")
     args = parser.parse_args()
 
     with open(os.path.join(HERE, "questions.jsonl"), encoding="utf-8") as f:
         questions = [json.loads(line) for line in f if line.strip()]
     if args.only:
         questions = [q for q in questions if q["category"] == args.only]
+    if args.retrieval:
+        compare_retrieval(questions, args.k)
+        return
 
     client = Groq()
     results = []
