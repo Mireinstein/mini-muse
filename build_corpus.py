@@ -72,24 +72,69 @@ def _load_env() -> None:
                 os.environ.setdefault(key, value.strip("\"'"))
 
 
+BULLET = ("●", "•", "- ", "* ")
+
+
+def _is_resume_section(line: str) -> bool:
+    # The resume PDF has no markdown, but its section titles are all caps
+    s = line.strip()
+    return len(s) > 3 and s.upper() == s and any(ch.isalpha() for ch in s)
+
+
+def _entry_pieces(paragraph: list[str]) -> list[str]:
+    """Keep a paragraph (one job, one degree) whole when it fits. When it doesn't,
+    split between bullets and repeat the entry's header lines on every piece, so a
+    bullet is never separated from the job and dates it belongs to."""
+    text = "\n".join(paragraph)
+    if len(text) <= CHUNK_CHARS:
+        return [text]
+
+    header: list[str] = []
+    items: list[list[str]] = []
+    for line in paragraph:
+        if line.lstrip().startswith(BULLET):
+            items.append([line])
+        elif items:
+            items[-1].append(line)  # wrapped continuation of the previous bullet
+        else:
+            header.append(line)
+
+    pieces, current = [], list(header)
+    for item in items:
+        if len(current) > len(header) and len("\n".join(current + item)) > CHUNK_CHARS:
+            pieces.append("\n".join(current))
+            current = list(header)
+        current += item
+    pieces.append("\n".join(current))
+    return pieces
+
+
 def chunk(corpus: str) -> list[dict]:
-    """Split on markdown headings, then cap each section at CHUNK_CHARS on line
-    boundaries. Every chunk carries its heading path so it reads on its own."""
+    """Split on headings (markdown, or the resume's all-caps section titles), then
+    pack whole entries into chunks of up to CHUNK_CHARS. Every chunk carries its
+    heading path so it reads on its own."""
     chunks = []
     h1 = h2 = ""
     lines: list[str] = []
 
     def flush() -> None:
         heading = f"{h1} > {h2}" if h2 else h1
-        window: list[str] = []
-        for line in lines + [None]:
-            if line is None or (window and len("\n".join(window + [line])) > CHUNK_CHARS):
-                text = "\n".join(window).strip()
-                if text:
-                    chunks.append({"heading": heading, "text": text})
-                window = []
-            if line is not None:
-                window.append(line)
+        paragraphs, para = [], []
+        for line in lines + [""]:
+            if line.strip():
+                para.append(line)
+            elif para:
+                paragraphs.append(para)
+                para = []
+
+        current = ""
+        for piece in (p for para in paragraphs for p in _entry_pieces(para)):
+            if current and len(current) + len(piece) + 2 > CHUNK_CHARS:
+                chunks.append({"heading": heading, "text": current})
+                current = ""
+            current = f"{current}\n\n{piece}" if current else piece
+        if current:
+            chunks.append({"heading": heading, "text": current})
         lines.clear()
 
     for line in corpus.splitlines():
@@ -99,6 +144,9 @@ def chunk(corpus: str) -> list[dict]:
         elif line.startswith("# "):
             flush()
             h1, h2 = line[2:].strip(), ""
+        elif h1 == "Resume" and _is_resume_section(line):
+            flush()
+            h2 = line.strip().title()
         elif line.strip() != "---":
             lines.append(line)
     flush()
