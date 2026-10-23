@@ -3,7 +3,10 @@ import type { ChatMessage } from "./types";
 // Ask one question. Sends the recent turns so follow-ups keep their referent,
 // and returns the full answer. The serverless function is fast enough that a
 // plain request/response (no streaming) keeps things simple and reliable.
-export async function ask(message: string, history: ChatMessage[]): Promise<string> {
+export async function ask(
+  message: string,
+  history: ChatMessage[],
+): Promise<{ answer: string; booking: boolean }> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -11,5 +14,5 @@ export async function ask(message: string, history: ChatMessage[]): Promise<stri
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
-  return data.answer as string;
+  return { answer: data.answer as string, booking: Boolean(data.booking) };
 }

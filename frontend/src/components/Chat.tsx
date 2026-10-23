@@ -8,6 +8,7 @@ const STARTERS = [
   "What are his projects?",
   "Where did he study?",
   "What's he interested in outside work?",
+  "Can I book a call with him?",
 ];
 
 export default function Chat() {
@@ -28,8 +29,8 @@ export default function Chat() {
     setMessages((m) => [...m, { role: "user", content: question }]);
     setBusy(true);
     try {
-      const answer = await ask(question, history);
-      setMessages((m) => [...m, { role: "assistant", content: answer }]);
+      const { answer, booking } = await ask(question, history);
+      setMessages((m) => [...m, { role: "assistant", content: answer, booking }]);
     } catch (e) {
       setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${String(e)}` }]);
     } finally {
