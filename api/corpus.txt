@@ -33,83 +33,74 @@ soccer.
 # Resume
 
 Admire Theophilus Madyira
- Greater Seattle Area | admiretmadyira@gmail.com | LinkedIn | GitHub
+
+ admiretmadyira@gmail.com | (413) 437-6346 | LinkedIn | GitHub | admiremadyira.com
+
 EXPERIENCE
- Software Engineer
- August 2025 – Present
-Microsoft
- Redmond, WA
- Engineer AI agents integrated into Copilot and Edge release pipelines, monitoring Kusto/ADX dashboards for build health, failure
-rates, and fleet telemetry, reducing incident triage from 30+ min to ~5 min.
- Halve Edge Update latency and double bandwidth savings by cutting payload sizes from 400MB to 200MB via differential patches
-with hash-based fingerprints; shipped to 1B+ devices with end-to-end ownership in C++, Bash, Python, C#, and Kusto QL.
- Lead Linux incident response: resolved 10 incidents impacting ~20,000 devices in three months and shipped YAML and Docker
-config validation into a nearly decade-old Smoke test pipeline.
- Design code check-in policies validating ~400 PRs/week, blocking stale compliance checks and flagging API changes lacking
-privacy review; earned full pipeline ownership within 3 months.
-Software Engineer Intern
- May 2024 – August 2024
-Microsoft
- Redmond, WA
- Designed and shipped an LLM council framework to evaluate model safety, benchmarking Copilot against prompt-injection,
-data-leakage, and jailbreak attacks at ~90% detection accuracy; delivered one month ahead of deadline.
- Built an AI agent for bug-fixing and crash analysis, cutting engineer triage time by ~50% and securing a return offer.
-Software Engineer Intern
- May 2023 – August 2023
-Microsoft
- Redmond, WA
- Optimized the Microsoft Edge search results algorithm and improved latency in C++, contributing to a ~5% lift in user retention.
- Ran an A/B experiment validating net positive revenue impact on Microsoft Bing.
-Machine Learning Engineer Intern
- June 2022 – August 2022
-Columbia University
- New York, NY
- Trained RL policies (PPO, SAC, DQN) for long-horizon motion control in the CARLA simulation environment, improving
-trajectory stability and decision accuracy across driving scenarios.
-Full Stack Engineer Apprentice
- June 2021 – May 2022
-Google
- Remote
- Built a full-stack marketing website for a poultry business as a capstone in the 10-month Google Africa Developer Scholarship
-program, using React.js, Node.js, GraphQL, PostgreSQL, and REST APIs under Google engineer mentorship.
+Software Engineer August 2025 – Present
+Microsoft Redmond, WA
+● Halved Edge Update latency and doubled bandwidth savings by cutting payload sizes from 400MB to 200MB via differential
+ patches with hash-based fingerprints; shipped to 1B+ devices in C++, Bash, Python, C#, and Kusto QL.
+● Implemented the first-ever enterprise update policies for the unified Microsoft Copilot Super App on Windows and macOS
+ (ADMX/ADML for Group Policy and Intune; .plist MDM profiles on macOS), enabling unification of 243M devices (235M
+ consumer, 8M enterprise), 95% of all eligible devices.
+● Built Target Channel policies letting admins pin devices to Stable or Beta, with automatic rollback when moving to a lower
+ channel, on top of macOS channel switching built for internal dogfooding which achieved 100% internal adoption.
+● Shipped ESRP-signed, notarized macOS Copilot .pkg installers with MDM configuration, exposed them to Intune via the
+ enterprise API, and cut release promotion time by 1 hour by moving MDM generation to Windows.
+● Engineered AI agents into Copilot and Edge release pipelines, monitoring Kusto/ADX dashboards for build health and fleet
+ telemetry, reducing incident triage from 30+ min to ~5 min.
+● Led Linux incident response: resolved 10 incidents impacting ~20K devices in three months and shipped YAML and Docker
+ config validation into a nearly decade-old Smoke test pipeline.
+● Designed code check-in policies validating ~400 PRs/week, blocking stale compliance checks and flagging API changes lacking
+ privacy review; earned full pipeline ownership within 3 months.
+
+Software Engineer Intern May 2024 – August 2024
+Microsoft Redmond, WA
+● Designed and shipped an LLM council framework to evaluate model safety, benchmarking Copilot against prompt-injection,
+ data-leakage, and jailbreak attacks at ~90% detection accuracy; delivered one month ahead of deadline.
+● Built an early AI agent directly into the Edge codebase for bug-fixing and crash analysis, cutting engineer triage time by ~50%.
+
+Software Engineer Intern May 2023 – August 2023
+Microsoft Redmond, WA
+● Modified the Microsoft Edge search ranking algorithm in C++ to support history-weighted and balanced result modes, exposed
+ through a new TypeScript personalization settings page; contributed to a ~5% lift in user retention.
+● Validated the feature via A/B experiment, observing reduced address-bar lingering and net positive revenue impact on Bing.
+
 SKILLS
- AI / ML: AI Agents, LLM Fine-Tuning, RAG, NLP, Reinforcement Learning (PPO, SAC, DQN), Model Evaluation, MLOps,
-LLMOps
-Languages: Python, C++, C#, SQL, Java, TypeScript, JavaScript, Bash, PowerShell
-Frameworks & Tools: PyTorch, TensorFlow, Scikit-Learn, Kusto/ADX, Kubernetes, Docker, Terraform, GitHub Actions, Catch2
-Systems & Infrastructure: Distributed Systems, Ultra Low Latency Optimization, System Design, CI/CD, Infrastructure as Code,
-Observability, Incident Management, SRE
-PROJECTS
- Agnostic LLM Watermarker
-  Co-built a study comparing prompt-level and token-level LLM watermarking: prompt constraints against a logit-biased greenlist
-across ~6,000 GPT-3.5-Turbo generations; RoBERTa detectors recovered 86% of prompt-based vs. 66% of token-level marks.
+Languages: Python, C++, C#, SQL, Java, TypeScript, JavaScript, Bash, PowerShell.
+Systems & Infrastructure: Distributed Systems, System Design, CI/CD, Infrastructure as Code, Observability, Incident
+Management, SRE, Azure.
+AI / ML: AI Agents, LLM Fine-Tuning, RAG, NLP, Model Evaluation, MLOps, LLMOps.
+Frameworks & Tools: PyTorch, TensorFlow, Kusto/ADX, Kubernetes, Docker, Terraform, GitHub Actions, Catch2.
+
 AWARDS & HONORS
-  Rhodes Scholarship Finalist (2025): Selected as 1 of 10 national finalists for the post-graduate scholarship at Oxford University.
- 2x Walker Award in Mathematics & Statistics, Amherst College (2023, 2025).
- Presidential & National Scholarship, Gov. of Zimbabwe (2020): Full study-abroad funding after ranking 1st of 50,000+ students on
-national A-Level exams.
+● Rhodes Scholarship Finalist (2025): Selected as 1 of 10 national finalists for the post-graduate scholarship at Oxford University.
+● 2x Walker Award in Mathematics & Statistics, Amherst College (2023, 2025).
+● Presidential & National Scholarship, Gov. of Zimbabwe (2020): Full study-abroad funding after ranking 1st of 50,000+ students
+ on national A-Level exams.
+
 EDUCATION
- Columbia University
-MSc. in Computer Science, specialization in Machine Learning.
- Expected 2027
-Relevant Coursework: Deep Learning & Neural Networks
-Amherst College
-BA in Computer Science & Mathematics.
- May 2025
+Columbia University Expected 2027
+MS in Computer Science, Part-time New York, NY
+Relevant Coursework: Deep Learning & Neural Networks.
+
+Amherst College May 2025
+BA in Computer Science & Mathematics Amherst, MA
 Relevant Coursework: Machine Learning, Natural Language Processing, Artificial Intelligence, Probability and Computing,
-Optimization, Linear Algebra with Applications, Algorithms, Computer Systems, Real Analysis, Statistical Modeling
+Optimization, Linear Algebra with Applications, Computer Systems, Real Analysis, Statistical Modeling.
 
 ---
 
 # Projects (GitHub)
 
-## mini-muse (Python)
-Mini-muse, your AI personal assistant Agent that helps with everyday tasks and personal goals
-Repository: https://github.com/Mireinstein/mini-muse
-
 ## mireinstein.github.io (JavaScript)
 My personal website
 Repository: https://github.com/Mireinstein/mireinstein.github.io
+
+## my-muse (TypeScript)
+My-muse, personal AI assistant 
+Repository: https://github.com/Mireinstein/my-muse
 
 ## Grey-Parrot (JavaScript)
 Real-time translation browser extension — watch any video in any language and get live subtitles in your own
