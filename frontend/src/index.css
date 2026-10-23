@@ -19,6 +19,11 @@ body {
 .prose-chat p {
   margin: 0.25rem 0;
 }
+.prose-chat a {
+  color: #7dd3fc;
+  text-decoration: underline;
+  word-break: break-word;
+}
 .prose-chat ul,
 .prose-chat ol {
   margin: 0.25rem 0;
