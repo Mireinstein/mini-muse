@@ -77,11 +77,15 @@ TOOLS = [
 ]
 
 
-def _answer(message: str, history: list[dict]) -> dict:
+def search_query(message: str, history: list[dict]) -> str:
     # A follow-up like "and when was that?" means nothing on its own, so search
     # with the previous question attached
     last_user = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
-    chunks = retrieve(f"{last_user}\n{message}".strip())
+    return f"{last_user}\n{message}".strip()
+
+
+def _answer(message: str, history: list[dict]) -> dict:
+    chunks = retrieve(search_query(message, history))
     context = "\n\n".join(f"[{c['heading']}]\n{c['text']}" for c in chunks)
 
     messages = [

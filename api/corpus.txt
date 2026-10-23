@@ -94,13 +94,13 @@ Optimization, Linear Algebra with Applications, Computer Systems, Real Analysis,
 
 # Projects (GitHub)
 
+## my-muse (Python)
+My-muse, personal AI assistant that anyone can chat with, manage booking sessions on my behalf and much more
+Repository: https://github.com/Mireinstein/my-muse
+
 ## mireinstein.github.io (JavaScript)
 My personal website
 Repository: https://github.com/Mireinstein/mireinstein.github.io
-
-## my-muse (TypeScript)
-My-muse, personal AI assistant 
-Repository: https://github.com/Mireinstein/my-muse
 
 ## Grey-Parrot (JavaScript)
 Real-time translation browser extension — watch any video in any language and get live subtitles in your own
