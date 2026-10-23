@@ -17,7 +17,7 @@ from groq import Groq
 MODEL = "openai/gpt-oss-20b"
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIMS = 768  # must match build_corpus.py, or the vectors aren't comparable
-TOP_K = 5
+TOP_K = 8
 
 with open(os.path.join(os.path.dirname(__file__), "index.json"), encoding="utf-8") as _f:
     INDEX = json.load(_f)
