@@ -29,8 +29,8 @@ export default function Chat() {
     setMessages((m) => [...m, { role: "user", content: question }]);
     setBusy(true);
     try {
-      const { answer, booking } = await ask(question, history);
-      setMessages((m) => [...m, { role: "assistant", content: answer, booking }]);
+      const { answer, booking, sources } = await ask(question, history);
+      setMessages((m) => [...m, { role: "assistant", content: answer, booking, sources }]);
     } catch (e) {
       setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${String(e)}` }]);
     } finally {

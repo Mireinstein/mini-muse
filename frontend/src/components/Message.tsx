@@ -47,6 +47,19 @@ export default function Message({ message }: { message: ChatMessage }) {
           {message.content}
         </ReactMarkdown>
       </div>
+      {message.sources && message.sources.length > 0 && (
+        <div className="mt-1.5 flex max-w-[85%] flex-wrap gap-1.5 pl-1">
+          {message.sources.map((s) => (
+            <span
+              key={s}
+              className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-400"
+              title="Source this answer is based on"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
       {message.booking && <BookingCalendar />}
     </div>
   );

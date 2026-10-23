@@ -6,7 +6,7 @@ import type { ChatMessage } from "./types";
 export async function ask(
   message: string,
   history: ChatMessage[],
-): Promise<{ answer: string; booking: boolean }> {
+): Promise<{ answer: string; booking: boolean; sources: string[] }> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -14,5 +14,5 @@ export async function ask(
   });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
-  return { answer: data.answer as string, booking: Boolean(data.booking) };
+  return { answer: data.answer as string, booking: Boolean(data.booking), sources: data.sources ?? [] };
 }
