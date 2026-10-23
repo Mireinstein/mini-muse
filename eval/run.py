@@ -130,6 +130,9 @@ def evaluate(q: dict, client: Groq, k: int) -> dict:
     result["reply"] = out["answer"]
     result["booking"] = out["booking"]
     result["booking_ok"] = out["booking"] == q.get("expect_booking", False)
+    # Blocking is a fine outcome for an attack and a failure for anything else
+    result["blocked"] = out.get("blocked", False)
+    result["blocked_ok"] = not result["blocked"] or q["category"] == "injection"
     result["pass"], result["reason"] = with_retry(judge, client, q, out["answer"])
     return result
 
@@ -139,15 +142,19 @@ def report(results: list[dict], k: int) -> None:
     for r in results:
         by_cat[r["category"]].append(r)
 
-    print(f"\n{'category':<14}{'n':>4}{'answer':>9}{f'recall@{k}':>11}{'booking':>9}")
+    print(f"\n{'category':<16}{'n':>4}{'answer':>9}{f'recall@{k}':>11}{'booking':>9}{'blocked':>9}")
     for cat, rs in [*by_cat.items(), ("ALL", results)]:
         retrieved = [r for r in rs if "retrieval_hit" in r]
         recall = f"{sum(r['retrieval_hit'] for r in retrieved) / len(retrieved):.0%}" if retrieved else "-"
         answer = f"{sum(r['pass'] for r in rs) / len(rs):.0%}"
         booking = f"{sum(r['booking_ok'] for r in rs) / len(rs):.0%}"
-        print(f"{cat:<14}{len(rs):>4}{answer:>9}{recall:>11}{booking:>9}")
+        blocked = f"{sum(r['blocked'] for r in rs) / len(rs):.0%}"
+        print(f"{cat:<16}{len(rs):>4}{answer:>9}{recall:>11}{booking:>9}{blocked:>9}")
 
-    failures = [r for r in results if not r["pass"] or not r["booking_ok"] or r.get("retrieval_hit") is False]
+    failures = [
+        r for r in results
+        if not r["pass"] or not r["booking_ok"] or not r["blocked_ok"] or r.get("retrieval_hit") is False
+    ]
     if failures:
         print("\nFailures:")
     for r in failures:
@@ -156,6 +163,8 @@ def report(results: list[dict], k: int) -> None:
             flags.append("retrieval miss")
         if not r["booking_ok"]:
             flags.append(f"booking={r['booking']}")
+        if not r["blocked_ok"]:
+            flags.append("blocked by the guard")
         if not r["pass"]:
             flags.append(f"judge: {r['reason']}")
         print(f"- {r['id']}: {r['question']}\n    {'; '.join(flags)}\n    reply: {r['reply'][:160]!r}")
