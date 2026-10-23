@@ -1,9 +1,13 @@
 """Vercel serverless function: answer one question about Admire.
 
-Hybrid retrieval: build_corpus.py stored one embedding per chunk in index.json.
-The question is embedded and ranked against them, ranked again with BM25 keyword
-scoring, and the two rankings are merged with reciprocal rank fusion. The model
-answers from the top chunks.
+Per request:
+1. A prompt-injection classifier screens the message; flagged messages never reach
+   the answering model.
+2. Hybrid retrieval: build_corpus.py stored one embedding per chunk in index.json.
+   The question is embedded and ranked against them, ranked again with BM25 keyword
+   scoring, and the two rankings are merged with reciprocal rank fusion.
+3. The model answers from the top chunks, citing them by number, and may call the
+   booking tool. Citations come back as a list of sources.
 
 The index is small enough to rank in plain Python, so there is no vector database
 to host.
@@ -13,6 +17,7 @@ import json
 import math
 import os
 import re
+import time
 import urllib.request
 from collections import Counter
 from http.server import BaseHTTPRequestHandler
@@ -113,6 +118,22 @@ def retrieve(query: str, k: int = TOP_K, mode: str = "hybrid") -> list[dict]:
     return [INDEX[i] for i in order[:k]]
 
 
+# --- Guard -----------------------------------------------------------------------
+
+def injection_score(client: Groq, message: str) -> tuple[float | None, str | None]:
+    """(probability that the message is a prompt injection or jailbreak, error).
+    The score is None if the classifier is unreachable: the system prompt still
+    refuses role changes, so an outage degrades to one layer of defence instead of
+    taking the chat down. The error goes into the trace so that isn't silent."""
+    try:
+        resp = client.chat.completions.create(model=GUARD_MODEL, messages=[{"role": "user", "content": message}])
+        return float(resp.choices[0].message.content), None
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"[:200]
+
+
+# --- Answering -------------------------------------------------------------------
+
 SYSTEM = (
     "You are the assistant on Admire Madyira's personal website. You answer "
     "visitors' questions about Admire — his work, background, projects, and "
@@ -165,21 +186,24 @@ def _extract_citations(text: str, chunks: list[dict]) -> tuple[str, list[str]]:
     return CITATION.sub("", text).strip(), sources
 
 
-def injection_score(client: Groq, message: str) -> float | None:
-    """Probability that the message is a prompt injection or jailbreak. None if the
-    classifier is unreachable: the system prompt still refuses role changes, so an
-    outage degrades to one layer of defence instead of taking the chat down."""
-    try:
-        resp = client.chat.completions.create(model=GUARD_MODEL, messages=[{"role": "user", "content": message}])
-        return float(resp.choices[0].message.content)
-    except Exception:
-        return None
+def _log(trace: dict) -> None:
+    # One JSON line per request; Vercel keeps function stdout as searchable logs
+    if os.environ.get("VERCEL"):
+        print(json.dumps(trace), flush=True)
 
 
 def _answer(message: str, history: list[dict]) -> dict:
+    started = time.monotonic()
     client = Groq()
-    score = injection_score(client, message)
+    trace: dict = {"question": message, "turns": len(history)}
+
+    score, guard_error = injection_score(client, message)
+    trace["guard_score"] = score
+    if guard_error:
+        trace["guard_error"] = guard_error
     if score is not None and score >= GUARD_THRESHOLD:
+        trace.update(blocked=True, latency_ms=round((time.monotonic() - started) * 1000))
+        _log(trace)
         return {"answer": BLOCKED_REPLY, "booking": False, "sources": [], "blocked": True}
 
     chunks = retrieve(search_query(message, history))
@@ -199,6 +223,17 @@ def _answer(message: str, history: list[dict]) -> dict:
     booking = bool(reply.tool_calls)
     text = reply.content or ("Pick a time that works for you below." if booking else "")
     answer, sources = _extract_citations(text, chunks)
+
+    trace.update(
+        blocked=False,
+        retrieved=[c["heading"] for c in chunks],
+        cited=sources,
+        booking=booking,
+        prompt_tokens=resp.usage.prompt_tokens,
+        completion_tokens=resp.usage.completion_tokens,
+        latency_ms=round((time.monotonic() - started) * 1000),
+    )
+    _log(trace)
     return {"answer": answer, "booking": booking, "sources": sources, "blocked": False}
 
 
