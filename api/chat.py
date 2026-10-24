@@ -125,11 +125,19 @@ def injection_score(client: Groq, message: str) -> tuple[float | None, str | Non
     The score is None if the classifier is unreachable: the system prompt still
     refuses role changes, so an outage degrades to one layer of defence instead of
     taking the chat down. The error goes into the trace so that isn't silent."""
-    try:
-        resp = client.chat.completions.create(model=GUARD_MODEL, messages=[{"role": "user", "content": message}])
-        return float(resp.choices[0].message.content), None
-    except Exception as exc:
-        return None, f"{type(exc).__name__}: {exc}"[:200]
+    # Groq's guard endpoint returns intermittent 500s. The SDK's own retries resend
+    # the same idempotency key and keep getting the same 500, so each attempt here
+    # is a fresh request
+    error = None
+    for _ in range(4):
+        try:
+            resp = client.with_options(max_retries=0).chat.completions.create(
+                model=GUARD_MODEL, messages=[{"role": "user", "content": message}]
+            )
+            return float(resp.choices[0].message.content), None
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"[:200]
+    return None, error
 
 
 # --- Answering -------------------------------------------------------------------
